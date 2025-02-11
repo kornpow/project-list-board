@@ -1,0 +1,11 @@
+# Rust build directory
+/target/
+
+
+# System specific files
+.DS_Store
+thumbs.db
+
+# Environment files
+.env
+.env.local
