@@ -1,0 +1,15 @@
+$schema: https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json
+basics:
+  name: Tester McHenry
+  label: Monkey Tester
+  image: ""
+  email: hungyhobbit@gmail.com
+  phone: (720) 123-4321
+  url: https://hungyhobbit.me
+  summary: Tester is a Rust lover, and loves to talk about testing.
+  location:
+    address: ""
+    postalCode: ""
+    city: Westminster
+    countryCode: US
+    region: Colorado

@@ -2,7 +2,7 @@ use std::{fs::File, io::BufReader};
 use actix_web::{web, App, HttpServer, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-
+use validator::{Validate, ValidationError};
 
 
 async fn hello() -> impl Responder {
@@ -14,20 +14,96 @@ async fn greet(name: web::Path<String>) -> impl Responder {
 }
 
 // Struct for POST request data
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct CreateUser {
     name: String,
     email: String,
 }
 
 // Struct for response data
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 struct UserResponse {
     id: u32,
     name: String,
     email: String,
     message: String,
 }
+
+#[derive(Deserialize, Serialize)]
+struct RJLocation {
+    address: String,
+    postalCode: String,
+    city: String,
+    countryCode: String,
+    region: String
+}
+
+#[derive(Deserialize, Serialize, Validate)]
+struct RJBasics {
+    name: String,
+    label: String,
+    image: String,
+    #[validate(email)]
+    email: String,
+    phone: String,
+    url: String,
+    summary: String,
+    location: RJLocation
+}
+
+// JSON Resume Base
+#[derive(Deserialize, Serialize, Validate)]
+struct ResumeJson {
+    #[serde(rename = "$schema")]
+    schema: String,
+    #[validate(nested)]
+    basics: RJBasics,
+    // work: String,
+    // volunteer: String,
+    // education: String,
+    // awards: String,
+    // certificates: String,
+    // publications: String,
+    // skills: String,
+    // languages: String,
+    // interests: String,
+    // references: String,
+    // projects: String
+}
+
+
+
+// #[derive(Deserialize, Serialize)]
+// struct ContactInfo {
+//     phone: String,
+//     email: String,
+//     address: Address,
+// }
+
+// #[derive(Deserialize, Serialize)]
+// struct Project {
+//     id: u32,
+//     name: String,
+//     description: String,
+//     start_date: String,
+//     end_date: Option<String>,
+//     status: String,
+// }
+
+// #[derive(Deserialize, Serialize)]
+// struct ComplexUser {
+//     id: u32,
+//     username: String,
+//     first_name: String,
+//     last_name: String,
+//     contact: ContactInfo,
+//     projects: Vec<Project>,
+//     created_at: u64,
+//     updated_at: u64,
+//     is_active: bool,
+// }
+
+
 
 // GET handler
 async fn get_user(user_id: web::Path<u32>) -> impl Responder {
@@ -112,6 +188,24 @@ async fn main() -> std::io::Result<()> {
         }
     });
 
+    match File::open("resume.yaml") {
+        Ok(file) => {
+            let result = serde_yaml::from_reader::<_, ResumeJson>(file);
+            match result {
+                Ok(data) => {
+                    println!("{}", data.basics.location.city);
+                    println!("{}", data.basics.email);
+                    match data.validate() {
+                        Ok(_) => println!("yaml validated!"),
+                        Err(e) => println!("BAD YAML!") 
+                    }
+                }
+                Err(e) => println!("Failed to parse YAML: {}", e)
+            }
+        },
+        Err(e) => println!("Failed to open file: {}", e)
+    }
+
     HttpServer::new(|| {
         App::new()
             .service(
@@ -136,4 +230,45 @@ async fn main() -> std::io::Result<()> {
     .bind("127.0.0.1:8080")?
     .run()
     .await
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{test, web, App};
+
+    #[actix_web::test]
+    async fn test_create_user() {
+        // Create test app
+        let app = test::init_service(
+            App::new().service(web::resource("/users").route(web::post().to(create_user)))
+        ).await;
+
+        // Create test payload
+        let payload = CreateUser {
+            name: String::from("Test User"),
+            email: String::from("test@example.com"),
+        };
+
+        // Create test request
+        let req = test::TestRequest::post()
+            .uri("/users")
+            .set_json(&payload)
+            .to_request();
+
+        // Perform test request
+        let resp = test::call_service(&app, req).await;
+
+        // Assert response status
+        assert!(resp.status().is_success());
+
+        // Parse response body
+        let body: UserResponse = test::read_body_json(resp).await;
+
+        // Assert response contents
+        assert_eq!(body.name, "Test User");
+        assert_eq!(body.email, "test@example.com");
+        assert_eq!(body.message, "User created successfully");
+    }
 }
