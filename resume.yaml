@@ -10,6 +10,6 @@ basics:
   location:
     address: ""
     postalCode: ""
-    city: Westminster
+    city: "MyCityHere"
     countryCode: US
     region: Colorado

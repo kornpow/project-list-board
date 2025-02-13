@@ -31,11 +31,11 @@ struct UserResponse {
 
 #[derive(Deserialize, Serialize)]
 struct RJLocation {
-    address: String,
-    postalCode: String,
-    city: String,
+    address: Option<String>,
+    postalCode: Option<String>,
+    city: Option<String>,
     countryCode: String,
-    region: String
+    region: Option<String>
 }
 
 #[derive(Deserialize, Serialize, Validate)]
@@ -171,65 +171,82 @@ fn get_current_timestamp() -> u64 {
     .as_secs()
 }
 
+fn option_to_string(option: &Option<String>) -> String {
+    match &option {
+        Some(value) => value.clone(),
+        None => "".to_string(), // Directly returning an empty string slice
+    }
+}
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+// #[actix_web::main]
+// async fn main() -> std::io::Result<()> {
+fn main() -> Result<(), ValidationError> {
     println!("Server starting at http://127.0.0.1:8080");
 
     let start_time = get_current_timestamp();
     println!("This time! {}", start_time);
 
     
-    tokio::spawn(async move {
-        loop {
-            let current_time = get_current_timestamp();
-            println!("Heartbeat: Server has been running for {} seconds", current_time-start_time);
-            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-        }
-    });
+    // tokio::spawn(async move {
+    //     loop {
+    //         let current_time = get_current_timestamp();
+    //         println!("Heartbeat: Server has been running for {} seconds", current_time-start_time);
+    //         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+    //     }
+    // });
 
     match File::open("resume.yaml") {
         Ok(file) => {
             let result = serde_yaml::from_reader::<_, ResumeJson>(file);
             match result {
                 Ok(data) => {
-                    println!("{}", data.basics.location.city);
+                    // let acity: String = option_to_string(&data.basics.location.city);
+                    let acity_raw = data.basics.location.city.clone();
+                    let acity: String = acity_raw.unwrap_or("".to_string());
+                    println!("{}", acity);
                     println!("{}", data.basics.email);
                     match data.validate() {
-                        Ok(_) => println!("yaml validated!"),
-                        Err(e) => println!("BAD YAML!") 
+                        Ok(_) => {
+                            println!("yaml validated!");
+                            Ok(())
+
+                        },
+                        Err(e) => {
+                            eprintln!("Failed to parse YAML: {:?}", e);
+                            return Err(ValidationError::new("Validation  failed"));  // Return a ValidationError on deserialization failure
+                        }
                     }
                 }
-                Err(e) => println!("Failed to parse YAML: {}", e)
+                Err(e) => return Err(ValidationError::new("Deserialization  failed"))
             }
         },
-        Err(e) => println!("Failed to open file: {}", e)
+        Err(e) => return Err(ValidationError::new("File IO failed"))
     }
 
-    HttpServer::new(|| {
-        App::new()
-            .service(
-                web::resource("/users/{user_id}")
-                    .route(web::get().to(get_user))
-                    .route(web::put().to(update_user))
-                    .route(web::delete().to(delete_user))
-            )
-            .service(
-                web::resource("/users")
-                    .route(web::post().to(create_user))
-            )
-            .service(
-                web::resource("/test")
-                    .route(web::get().to(show_raw_data))
-            )
-            .service(
-                web::resource("/hello/{name}")
-                    .route(web::get().to(greet))
-            )
-    })
-    .bind("127.0.0.1:8080")?
-    .run()
-    .await
+    // HttpServer::new(|| {
+    //     App::new()
+    //         .service(
+    //             web::resource("/users/{user_id}")
+    //                 .route(web::get().to(get_user))
+    //                 .route(web::put().to(update_user))
+    //                 .route(web::delete().to(delete_user))
+    //         )
+    //         .service(
+    //             web::resource("/users")
+    //                 .route(web::post().to(create_user))
+    //         )
+    //         .service(
+    //             web::resource("/test")
+    //                 .route(web::get().to(show_raw_data))
+    //         )
+    //         .service(
+    //             web::resource("/hello/{name}")
+    //                 .route(web::get().to(greet))
+    //         )
+    // })
+    // .bind("127.0.0.1:8080")?
+    // .run()
+    // .await
 }
 
 
